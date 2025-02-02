@@ -3,7 +3,7 @@ import librosa
 import soundfile as sf
 import noisereduce as nr
 import numpy as np
-from denoiser import pretrained
+
 
 
 class AudioProcessor:
