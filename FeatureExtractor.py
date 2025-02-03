@@ -2,6 +2,7 @@ import os
 import librosa
 import numpy as np
 import scipy.signal
+import logging
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
@@ -14,10 +15,40 @@ class FeatureExtractor:
         self.labels = []
         self.use_pca = use_pca
         self.n_components = n_components
-        # self.feature_length = 15
         self.pca = None  # Inicializamos PCA como None
-        self.scaler = StandardScaler()  # Inicializamos el scaler. # StandardScaler estandariza los datos a una distribución con media 0 y desviación estándar 1.
+        self.scaler = StandardScaler()
         self.feature_prueba = []
+
+    def imprimir_estadisticas_por_clase(self, clase, num_componentes=3):
+        """
+        Imprime estadísticas (media, std, min, max) de las primeras 'num_componentes' componentes
+        de la matriz de características (idealmente, la transformada por PCA) para la clase especificada.
+        
+        Se asume que self.labels es una lista de tuplas en el formato (etiqueta, nombre_archivo)
+        y que self.feature_matrix ya contiene las características transformadas (por ejemplo, por PCA)
+        si se activó esa opción.
+        """
+        # Buscar los índices donde la etiqueta (primer elemento de la tupla) coincide con la clase deseada.
+        indices = [i for i, lbl in enumerate(self.labels) if lbl[0].lower() == clase.lower()]
+        
+        if not indices:
+            print(f"No se encontraron muestras para la clase '{clase}'.")
+            return
+        
+        # Extraer las filas correspondientes y limitarse a las primeras 'num_componentes' columnas.
+        # Si no usaste PCA, estarás viendo las primeras 'num_componentes' características de la matriz escalada.
+        datos = self.feature_matrix[indices, :num_componentes]
+        
+        media = np.mean(datos, axis=0)
+        std = np.std(datos, axis=0)
+        minimo = np.min(datos, axis=0)
+        maximo = np.max(datos, axis=0)
+        
+        print(f"\nEstadísticas para la clase '{clase}' (primeras {num_componentes} componentes):")
+        print(f"Media: {media}")
+        print(f"Desviación estándar: {std}")
+        print(f"Mínimo: {minimo}")
+        print(f"Máximo: {maximo}")
 
     def calcular_energia(self, audio):
         energia = np.sum(audio**2) / len(audio)
@@ -31,78 +62,80 @@ class FeatureExtractor:
         freqs = np.fft.fftfreq(len(fft_spectrum))
         positive_freqs = freqs[:len(freqs) // 2]
         magnitude_spectrum = np.abs(fft_spectrum[:len(fft_spectrum) // 2])
-        peaks, _ = scipy.signal.find_peaks(magnitude_spectrum, height=0)
+        peaks, _ = scipy.signal.find_peaks(magnitude_spectrum, height=20)
         formants = positive_freqs[peaks] * sample_rate
-        return formants[:2] if len(formants) >= 2 else [0, 0]
+        return formants[:3] if len(formants) >= 3 else [0, 0, 0]
 
-    def extraer_caracteristicas(self, audio, sample_rate, n_mfcc=13, debug=False):
+    def extraer_caracteristicas(self, audio, sample_rate, n_mfcc=20, debug=False):
         """
-        Este método extrae características tanto para los audios de entrenamiento como para el audio de prueba.
-        Se elimina la segmentación del primer tercio y se agregan formantes a todos los audios.
+        Extrae características del audio dividiéndolo en 10 segmentos.
+        Si debug es True, se registran detalles para cada segmento.
         """
-        # Dividir el audio en partes iguales (por ejemplo, en 3 partes)
-        num_segmentos = 10
+        num_segmentos = 4
         segmento_duracion = len(audio) // num_segmentos
-        segmentos = [audio[i*segmento_duracion:(i+1)*segmento_duracion] for i in range(num_segmentos)]
+        segmentos = [audio[i * segmento_duracion:(i + 1) * segmento_duracion] for i in range(num_segmentos)]
 
-        # Extraer características de cada segmento
         mfcc_features = []
         zcr_features = []
-        formants_features = []  # Para guardar los formantes de cada segmento
+        formants_features = []
 
         for i, segmento in enumerate(segmentos):
             mfcc = librosa.feature.mfcc(
-            y=segmento, 
-            sr=sample_rate, 
-            n_mfcc=13,
-            n_fft=2048,    # Reducir de 2048 (valor por defecto)
-            hop_length=512 # Reducir de 512
+                y=segmento, 
+                sr=sample_rate, 
+                n_mfcc=n_mfcc,
+                n_fft=2048,
+                hop_length=512,
             )
-            delta_mfcc = librosa.feature.delta(mfcc, width=5, mode='nearest')             # 1ra derivada
-            delta2_mfcc = librosa.feature.delta(mfcc, order=2, width=5, mode='nearest')   # 2da derivada
+            delta_mfcc = librosa.feature.delta(mfcc, width=5, mode='nearest')
+            delta2_mfcc = librosa.feature.delta(mfcc, order=2, width=5, mode='nearest')
 
-            # Promediar y concatenar todas las características del segmento
             mfcc_mean = np.mean(mfcc, axis=1)
             delta_mean = np.mean(delta_mfcc, axis=1)
             delta2_mean = np.mean(delta2_mfcc, axis=1)
 
-            # Si debug está activo, mostramos información del segmento
-            if debug:
-                print(f"[DEBUG] Segmento {i+1}: Primeros 3 MFCC: {mfcc_mean[:3]}")
-                print(f"[DEBUG] Segmento {i+1}: Primeros 3 Delta MFCC: {delta_mean[:3]}")
-                print(f"[DEBUG] Segmento {i+1}: Primeros 3 Delta2 MFCC: {delta2_mean[:3]}")
+            #if debug:
+                #logging.debug(f"Segmento {i+1}: Primeros 3 MFCC: {mfcc_mean[:3]}")
+                #logging.debug(f"Segmento {i+1}: Primeros 3 Delta MFCC: {delta_mean[:3]}")
+                #logging.debug(f"Segmento {i+1}: Primeros 3 Delta2 MFCC: {delta2_mean[:3]}")
 
-            mfcc_features.append(np.concatenate([mfcc_mean, delta_mean, delta2_mean]))  # ¡Aquí está el cambio!
+            mfcc_features.append(np.concatenate([mfcc_mean, delta_mean, delta2_mean]))
 
-            # Calcular ZCR para cada segmento
             zcr = self.calcular_zcr(segmento)
             zcr_features.append(zcr)
-            
-            # Calcular formantes para el segmento
+
             formants = self.calcular_formantes(segmento, sample_rate)
-            if debug:
-                print(f"[DEBUG] Segmento {i+1}: Formantes: {formants}")
-            # Aquí, suponiendo que la función devuelve dos valores,
-            # se agregan de forma consecutiva para cada segmento.
+            #if debug:
+             #   logging.debug(f"Segmento {i+1}: Formantes: {formants}")
             formants_features.extend(formants)
-            
-        # Aplanar la lista de características MFCC
+
+            # (Opcional) Podrías registrar la longitud de cada segmento
+            #logging.debug(f"Segmento {i+1}: Longitud del segmento: {len(segmento)}")
+
         mfcc_features = np.concatenate(mfcc_features)
         zcr_features = np.array(zcr_features).flatten()
-
-        # Calcular formantes (siempre se agregan)
-        #formantes = self.calcular_formantes(audio, sample_rate)
-        
-        # Concatenar MFCC, ZCR y formantes
         features = np.concatenate((mfcc_features, zcr_features, np.array(formants_features)))
 
-        print(f"[DEBUG] Estadísticas de características extraídas: min={np.min(features):.3f}, max={np.max(features):.3f}, mean={np.mean(features):.3f}")
-
-        #print(f"Número de características: {len(features)}")
-        
+        logging.debug(f"Estadísticas de características extraídas: min={np.min(features):.3f}, max={np.max(features):.3f}, mean={np.mean(features):.3f}")
         return features
-
     
+    def calcular_pitch(self, audio, sample_rate):
+        """
+        Estima la frecuencia fundamental (pitch) utilizando librosa.pyin.
+        Retorna el valor promedio de F0 a lo largo del audio.
+        """
+        try:
+            f0, voiced_flag, voiced_prob = librosa.pyin(audio, fmin=librosa.note_to_hz('C2'),
+                                                        fmax=librosa.note_to_hz('C7'))
+            # Elimina los valores NaN (no detectados)
+            if f0 is not None:
+                f0 = f0[~np.isnan(f0)]
+                if len(f0) > 0:
+                    return np.mean(f0)
+        except Exception as e:
+            logging.debug(f"Error al calcular pitch: {e}")
+        return 0.0
+
     def procesar_todos_los_audios(self):
         """Este método ahora se puede usar tanto para un directorio de audios como para un solo archivo"""
         print(f"Verificando la ruta de entrada: {self.input_folder}")
@@ -163,11 +196,15 @@ class FeatureExtractor:
 
         # Extraer las características; se pasa debug_flag
         caracteristicas = self.extraer_caracteristicas(audio, sample_rate, n_mfcc=13, debug=debug_flag)
+
+        #pitch_promedio = self.calcular_pitch(audio, sample_rate)
+        #logging.debug(f"Pitch promedio: {pitch_promedio}")
         
         try:
             features = [energia] + list(caracteristicas)
-            print(f"[DEBUG] Longitud de características extraídas SIN energía: {len(caracteristicas)}")
-            print(f"[DEBUG] Longitud TOTAL de features (con energía): {len(features)}")
+            logging.debug(f"Longitud total de features (con energía y pitch): {len(features)}")
+            #print(f"[DEBUG] Longitud de características extraídas SIN energía: {len(caracteristicas)}")
+            #print(f"[DEBUG] Longitud TOTAL de features (con energía): {len(features)}")
         except Exception as e:
             print("NO se ha aplicado la suma de features (energía + características)")
 
@@ -257,4 +294,37 @@ class FeatureExtractor:
         # Mostrar leyenda con el nombre de cada clase
         ax.legend()
 
+        plt.show()
+
+    def mostrar_scree_plot(self):
+        """
+        Si se ha aplicado PCA, muestra un scree plot que ilustra:
+          - La varianza explicada por cada componente.
+          - La varianza acumulada.
+        """
+        if self.pca is None:
+            print("PCA no se ha aplicado.")
+            return
+
+        # Obtener la varianza explicada por cada componente
+        evr = self.pca.explained_variance_ratio_
+        # Calcular la suma acumulada
+        cumulative = np.cumsum(evr)
+        
+        # Imprimir la varianza explicada y la acumulada
+        print("Varianza explicada por cada componente:")
+        print(evr)
+        print("Varianza acumulada:")
+        print(cumulative)
+        
+        # Crear el scree plot
+        plt.figure(figsize=(8, 5))
+        componentes = np.arange(1, len(evr) + 1)
+        plt.plot(componentes, evr, marker='o', label='Varianza explicada')
+        plt.plot(componentes, cumulative, marker='x', label='Varianza acumulada')
+        plt.xlabel('Número de Componentes')
+        plt.ylabel('Proporción de Varianza')
+        plt.title('Scree Plot')
+        plt.legend()
+        plt.grid(True)
         plt.show()

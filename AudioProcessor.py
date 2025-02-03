@@ -4,8 +4,6 @@ import soundfile as sf
 import noisereduce as nr
 import numpy as np
 
-
-
 class AudioProcessor:
     def __init__(self, input_folder="AudiosOriginales", output_folder="AudiosProcesados", silence_threshold=25):
         # Comprobar si la carpeta de salida 'AudiosProcesados' está vacía o no existe
