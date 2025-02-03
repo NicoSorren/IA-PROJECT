@@ -68,8 +68,14 @@ class FeatureExtractor:
 
     def extraer_caracteristicas(self, audio, sample_rate, n_mfcc=20, debug=False):
         """
-        Extrae características del audio dividiéndolo en 10 segmentos.
-        Si debug es True, se registran detalles para cada segmento.
+        Extrae características del audio dividiéndolo en 4 segmentos.
+        Para cada segmento se calculan:
+        - MFCC (n_mfcc coeficientes) y su primer derivada (delta)
+        - Spectral Contrast (usando librosa.feature.spectral_contrast)
+        Se promedian estas características a lo largo del tiempo y se concatenan.
+        Además, se calcula la tasa de cruce por cero (ZCR) y los formantes.
+        
+        Si debug es True, se pueden registrar detalles para cada segmento.
         """
         num_segmentos = 4
         segmento_duracion = len(audio) // num_segmentos
@@ -80,6 +86,7 @@ class FeatureExtractor:
         formants_features = []
 
         for i, segmento in enumerate(segmentos):
+            # Calcular MFCC y delta
             mfcc = librosa.feature.mfcc(
                 y=segmento, 
                 sr=sample_rate, 
@@ -88,37 +95,50 @@ class FeatureExtractor:
                 hop_length=512,
             )
             delta_mfcc = librosa.feature.delta(mfcc, width=5, mode='nearest')
-            delta2_mfcc = librosa.feature.delta(mfcc, order=2, width=5, mode='nearest')
 
             mfcc_mean = np.mean(mfcc, axis=1)
             delta_mean = np.mean(delta_mfcc, axis=1)
-            #delta2_mean = np.mean(delta2_mfcc, axis=1)
 
-            #if debug:
-                #logging.debug(f"Segmento {i+1}: Primeros 3 MFCC: {mfcc_mean[:3]}")
-                #logging.debug(f"Segmento {i+1}: Primeros 3 Delta MFCC: {delta_mean[:3]}")
-                #logging.debug(f"Segmento {i+1}: Primeros 3 Delta2 MFCC: {delta2_mean[:3]}")
+            # Calcular Spectral Contrast y promediar a lo largo del tiempo (axis=1)
+            spectral_contrast = librosa.feature.spectral_contrast(
+                y=segmento, 
+                sr=sample_rate, 
+                n_fft=2048, 
+                hop_length=512
+            )
+            spectral_contrast_mean = np.mean(spectral_contrast, axis=1)
 
-            mfcc_features.append(np.concatenate([mfcc_mean, delta_mean]))
+            # Concatenar MFCC, delta y spectral contrast para el segmento
+            features_segmento = np.concatenate([mfcc_mean, delta_mean, spectral_contrast_mean])
+            mfcc_features.append(features_segmento)
 
+            # Calcular ZCR para el segmento
             zcr = self.calcular_zcr(segmento)
             zcr_features.append(zcr)
 
+            # Calcular formantes para el segmento
             formants = self.calcular_formantes(segmento, sample_rate)
-            #if debug:
-             #   logging.debug(f"Segmento {i+1}: Formantes: {formants}")
             formants_features.extend(formants)
 
-            # (Opcional) Podrías registrar la longitud de cada segmento
-            #logging.debug(f"Segmento {i+1}: Longitud del segmento: {len(segmento)}")
+            if debug:
+                logging.debug(f"Segmento {i+1}: Primeros 3 MFCC: {mfcc_mean[:3]}")
+                logging.debug(f"Segmento {i+1}: Primeros 3 Delta MFCC: {delta_mean[:3]}")
+                logging.debug(f"Segmento {i+1}: Spectral Contrast (media): {spectral_contrast_mean}")
+                logging.debug(f"Segmento {i+1}: Formantes: {formants}")
+                logging.debug(f"Segmento {i+1}: Longitud del segmento: {len(segmento)}")
 
+        # Concatenar las características de todos los segmentos:
+        # - mfcc_features: vectores concatenados de MFCC, delta y spectral contrast (por segmento).
+        # - zcr_features: un valor de ZCR por segmento.
+        # - formants_features: 3 valores de formantes por segmento.
         mfcc_features = np.concatenate(mfcc_features)
         zcr_features = np.array(zcr_features).flatten()
         features = np.concatenate((mfcc_features, zcr_features, np.array(formants_features)))
 
         logging.debug(f"Estadísticas de características extraídas: min={np.min(features):.3f}, max={np.max(features):.3f}, mean={np.mean(features):.3f}")
         return features
-    
+
+        
     def calcular_pitch(self, audio, sample_rate):
         """
         Estima la frecuencia fundamental (pitch) utilizando librosa.pyin.
