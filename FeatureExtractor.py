@@ -92,14 +92,14 @@ class FeatureExtractor:
 
             mfcc_mean = np.mean(mfcc, axis=1)
             delta_mean = np.mean(delta_mfcc, axis=1)
-            delta2_mean = np.mean(delta2_mfcc, axis=1)
+            #delta2_mean = np.mean(delta2_mfcc, axis=1)
 
             #if debug:
                 #logging.debug(f"Segmento {i+1}: Primeros 3 MFCC: {mfcc_mean[:3]}")
                 #logging.debug(f"Segmento {i+1}: Primeros 3 Delta MFCC: {delta_mean[:3]}")
                 #logging.debug(f"Segmento {i+1}: Primeros 3 Delta2 MFCC: {delta2_mean[:3]}")
 
-            mfcc_features.append(np.concatenate([mfcc_mean, delta_mean, delta2_mean]))
+            mfcc_features.append(np.concatenate([mfcc_mean, delta_mean]))
 
             zcr = self.calcular_zcr(segmento)
             zcr_features.append(zcr)
