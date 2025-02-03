@@ -103,7 +103,7 @@ class FeatureExtractor:
             spectral_contrast = librosa.feature.spectral_contrast(
                 y=segmento, 
                 sr=sample_rate, 
-                n_fft=2048, 
+                n_fft=1024, 
                 hop_length=512
             )
             spectral_contrast_mean = np.mean(spectral_contrast, axis=1)
