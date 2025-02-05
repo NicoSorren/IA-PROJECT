@@ -98,10 +98,10 @@ def main():
 
     # Mostrar porcentaje de varianza retenida (si se usó PCA)
     if extractor.use_pca and extractor.pca is not None:
-        print("\nVarianza explicada por PCA:")
-        print(extractor.pca.explained_variance_ratio_)
+        #print("\nVarianza explicada por PCA:")
+        #print(extractor.pca.explained_variance_ratio_)
         total_varianza = np.sum(extractor.pca.explained_variance_ratio_)
-        print("Suma total de varianza retenida: {:.2f}%".format(total_varianza * 100))
+        #print("Suma total de varianza retenida: {:.2f}%".format(total_varianza * 100))
 
         # Mostrar el scree plot con la varianza explicada y acumulada
         extractor.mostrar_scree_plot()

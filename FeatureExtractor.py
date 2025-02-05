@@ -23,20 +23,15 @@ class FeatureExtractor:
         """
         Imprime estadísticas (media, std, min, max) de las primeras 'num_componentes' componentes
         de la matriz de características (idealmente, la transformada por PCA) para la clase especificada.
-        
-        Se asume que self.labels es una lista de tuplas en el formato (etiqueta, nombre_archivo)
-        y que self.feature_matrix ya contiene las características transformadas (por ejemplo, por PCA)
-        si se activó esa opción.
         """
-        # Buscar los índices donde la etiqueta (primer elemento de la tupla) coincide con la clase deseada.
+        # Buscar los índices donde la etiqueta (primer elemento de la tupla) coincide con la clase deseada
         indices = [i for i, lbl in enumerate(self.labels) if lbl[0].lower() == clase.lower()]
         
         if not indices:
             print(f"No se encontraron muestras para la clase '{clase}'.")
             return
         
-        # Extraer las filas correspondientes y limitarse a las primeras 'num_componentes' columnas.
-        # Si no usaste PCA, estarás viendo las primeras 'num_componentes' características de la matriz escalada.
+        # Extraer las filas correspondientes y limitarse a las primeras 'num_componentes' columnas
         datos = self.feature_matrix[indices, :num_componentes]
         
         media = np.mean(datos, axis=0)
@@ -68,13 +63,6 @@ class FeatureExtractor:
 
     def extraer_caracteristicas(self, audio, sample_rate, n_mfcc=20, debug=False):
         """
-        Extrae características del audio dividiéndolo en 4 segmentos.
-        Para cada segmento se calculan:
-        - MFCC (n_mfcc coeficientes) y su primer derivada (delta)
-        - Spectral Contrast (usando librosa.feature.spectral_contrast)
-        Se promedian estas características a lo largo del tiempo y se concatenan.
-        Además, se calcula la tasa de cruce por cero (ZCR) y los formantes.
-        
         Si debug es True, se pueden registrar detalles para cada segmento.
         """
         num_segmentos = 4
@@ -127,10 +115,6 @@ class FeatureExtractor:
                 logging.debug(f"Segmento {i+1}: Formantes: {formants}")
                 logging.debug(f"Segmento {i+1}: Longitud del segmento: {len(segmento)}")
 
-        # Concatenar las características de todos los segmentos:
-        # - mfcc_features: vectores concatenados de MFCC, delta y spectral contrast (por segmento).
-        # - zcr_features: un valor de ZCR por segmento.
-        # - formants_features: 3 valores de formantes por segmento.
         mfcc_features = np.concatenate(mfcc_features)
         zcr_features = np.array(zcr_features).flatten()
         features = np.concatenate((mfcc_features, zcr_features, np.array(formants_features)))
@@ -138,26 +122,8 @@ class FeatureExtractor:
         logging.debug(f"Estadísticas de características extraídas: min={np.min(features):.3f}, max={np.max(features):.3f}, mean={np.mean(features):.3f}")
         return features
 
-        
-    def calcular_pitch(self, audio, sample_rate):
-        """
-        Estima la frecuencia fundamental (pitch) utilizando librosa.pyin.
-        Retorna el valor promedio de F0 a lo largo del audio.
-        """
-        try:
-            f0, voiced_flag, voiced_prob = librosa.pyin(audio, fmin=librosa.note_to_hz('C2'),
-                                                        fmax=librosa.note_to_hz('C7'))
-            # Elimina los valores NaN (no detectados)
-            if f0 is not None:
-                f0 = f0[~np.isnan(f0)]
-                if len(f0) > 0:
-                    return np.mean(f0)
-        except Exception as e:
-            logging.debug(f"Error al calcular pitch: {e}")
-        return 0.0
-
     def procesar_todos_los_audios(self):
-        """Este método ahora se puede usar tanto para un directorio de audios como para un solo archivo"""
+
         print(f"Verificando la ruta de entrada: {self.input_folder}")
 
         if os.path.isdir(self.input_folder):    # verifica si input_folder es un directorio
@@ -168,7 +134,6 @@ class FeatureExtractor:
 
             for archivo in os.listdir(self.input_folder):
                 if archivo.endswith(".wav"):
-                    #print(f"archivo antes de procesar_audio es:{archivo}")
                     self.procesar_audio(archivo)
             
             self.feature_matrix = np.array(self.feature_matrix)     # convierte self.feature_matrix (que hasta este punto es una lista de listas) en un array de NumPy.
@@ -188,7 +153,6 @@ class FeatureExtractor:
             except Exception as e:
                 print("No se pudo ejecutar procesar_audios con audio de prueba")
 
-                                
         return self.feature_matrix, self.labels, self.feature_prueba
 
     def procesar_audio(self, archivo_audio):
@@ -217,14 +181,9 @@ class FeatureExtractor:
         # Extraer las características; se pasa debug_flag
         caracteristicas = self.extraer_caracteristicas(audio, sample_rate, n_mfcc=13, debug=debug_flag)
 
-        #pitch_promedio = self.calcular_pitch(audio, sample_rate)
-        #logging.debug(f"Pitch promedio: {pitch_promedio}")
-        
         try:
             features = [energia] + list(caracteristicas)
             logging.debug(f"Longitud total de features (con energía y pitch): {len(features)}")
-            #print(f"[DEBUG] Longitud de características extraídas SIN energía: {len(caracteristicas)}")
-            #print(f"[DEBUG] Longitud TOTAL de features (con energía): {len(features)}")
         except Exception as e:
             print("NO se ha aplicado la suma de features (energía + características)")
 
@@ -264,13 +223,8 @@ class FeatureExtractor:
         Muestra una gráfica 3D de las características (tras PCA)
         para las cuatro clases de verduras: 'papa', 'berenjena', 'zanahoria' y 'camote'.
         """
-
-        # 1. Extraer solo la clase de self.labels (ignorando el nombre del archivo)
-        #    labels_reales será algo como ["papa", "berenjena", "papa", "camote", ...]
         labels_reales = [lbl[0] for lbl in self.labels]
 
-        # 2. Definir las clases y sus colores correspondientes
-        #    (Si cambias la clase, asegúrate de añadirla aquí)
         clases = ["papa", "berenjena", "zanahoria", "camote"]
         colores = {
             "papa": "yellow",
@@ -283,7 +237,6 @@ class FeatureExtractor:
         fig = plt.figure(figsize=(10, 7))
         ax = fig.add_subplot(111, projection='3d')
 
-        # 3. Para cada clase, filtra los índices que le correspondan y grafica esos puntos
         for clase in clases:
             # Obtener índices donde la etiqueta real sea la clase actual
             indices = [i for i, c in enumerate(labels_reales) if c == clase]
