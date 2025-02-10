@@ -34,12 +34,12 @@ class ImageProcessor:
         """
         # Aumentar el contraste
         alpha = 1.8 # Factor de contraste (>1 aumenta el contraste)
-        beta = 40    # Valor de brillo
+        beta = 40   # Valor de brillo
         imagen = cv2.convertScaleAbs(imagen, alpha=alpha, beta=beta)
 
         # Aumentar la saturación
         hsv = cv2.cvtColor(imagen, cv2.COLOR_RGB2HSV)
-        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 50)  # Aumentar el canal de saturación
+        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 110)  # Aumentar el canal de saturación
         imagen = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
         # Redimensionar la imagen a 224x224
