@@ -33,20 +33,20 @@ class ImageProcessor:
         Aplica transformaciones a la imagen: exposición, contraste, saturación, y nitidez.
         """
         # Aumentar el contraste
-        alpha = 1.8 # Factor de contraste (>1 aumenta el contraste)
-        beta = 40   # Valor de brillo
+        alpha = 1.9 # Factor de contraste (>1 aumenta el contraste)
+        beta = 50   # Valor de brillo
         imagen = cv2.convertScaleAbs(imagen, alpha=alpha, beta=beta)
 
         # Aumentar la saturación
         hsv = cv2.cvtColor(imagen, cv2.COLOR_RGB2HSV)
-        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 110)  # Aumentar el canal de saturación
+        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 140)  # Aumentar el canal de saturación
         imagen = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
         # Redimensionar la imagen a 224x224
         imagen = cv2.resize(imagen, (224, 224), interpolation=cv2.INTER_AREA)
 
         # Filtro de nitidez
-        kernel = np.array([[0, -1, 0], [-1, 5.3, -1], [0, -1, 0]])
+        kernel = np.array([[0, -1, 0], [-1, 5.5, -1], [0, -1, 0]])
         imagen = cv2.filter2D(imagen, -1, kernel)
 
         return imagen
