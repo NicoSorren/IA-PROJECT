@@ -33,7 +33,7 @@ class ImageProcessor:
         Aplica transformaciones a la imagen: exposición, contraste, saturación, y nitidez.
         """
         # Aumentar el contraste
-        alpha = 1.3 # Factor de contraste (>1 aumenta el contraste)
+        alpha = 1.8 # Factor de contraste (>1 aumenta el contraste)
         beta = 40    # Valor de brillo
         imagen = cv2.convertScaleAbs(imagen, alpha=alpha, beta=beta)
 
