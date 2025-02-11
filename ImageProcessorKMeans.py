@@ -84,6 +84,88 @@ class ImageProcessorKMeans:
                         etiquetas.append(verdura)  # Se extrae la etiqueta según la carpeta
         return np.array(caracteristicas), np.array(etiquetas)
 
+    def extraer_caracteristicas_forma(self, input_folder="ImagenesContorno"):
+        """
+        Recorre todas las imágenes en la carpeta 'input_folder' (por defecto, ImagenesContorno)
+        y extrae dos características de forma para el contorno principal de cada imagen:
+            - Redondez (Circularidad)
+            - Alargamiento (relación entre eje mayor y eje menor de la elipse ajustada)
+            
+        Retorna un diccionario con la siguiente estructura:
+            {
+              'nombre_clase': [
+                  (nombre_imagen, redondez, alargamiento),
+                  (nombre_imagen, redondez, alargamiento),
+                  ...
+              ],
+              ...
+            }
+        """
+        caracteristicas_forma = {}
+        
+        # Listar las subcarpetas (clases) en input_folder
+        clases = os.listdir(input_folder)
+        
+        for clase in clases:
+            carpeta_clase = os.path.join(input_folder, clase)
+            if not os.path.isdir(carpeta_clase):
+                continue
+            
+            caracteristicas_forma[clase] = []
+            imagenes = os.listdir(carpeta_clase)
+            
+            for nombre in imagenes:
+                ruta_imagen = os.path.join(carpeta_clase, nombre)
+                # Leer la imagen; se espera que esté en un formato adecuado (por ejemplo, en BGR)
+                img = cv2.imread(ruta_imagen)
+                if img is None:
+                    print(f"No se pudo leer la imagen: {ruta_imagen}")
+                    continue
+                # Convertir a escala de grises si no lo está ya
+                if len(img.shape) == 3:
+                    gris = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                else:
+                    gris = img.copy()
+                
+                # Encontrar contornos
+                contours, hierarchy = cv2.findContours(gris.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if not contours:
+                    print(f"No se encontraron contornos en la imagen: {ruta_imagen}")
+                    continue
+                
+                # Seleccionar el contorno con mayor área
+                contorno_principal = max(contours, key=cv2.contourArea)
+                
+                # Calcular área y perímetro
+                area = cv2.contourArea(contorno_principal)
+                perimetro = cv2.arcLength(contorno_principal, True)
+                redondez = (4 * np.pi * area) / (perimetro * perimetro) if perimetro > 0 else 0
+                
+                # Calcular alargamiento usando cv2.fitEllipse (si el contorno tiene al menos 5 puntos)
+                if len(contorno_principal) >= 5:
+                    ellipse = cv2.fitEllipse(contorno_principal)
+                    eje1, eje2 = ellipse[1]  # ellipse[1] devuelve una tupla (dim1, dim2)
+                    eje_mayor = max(eje1, eje2)
+                    eje_menor = min(eje1, eje2)
+                    alargamiento = eje_mayor / eje_menor if eje_menor > 0 else 0
+                else:
+                    alargamiento = 0
+                
+                # Guardar las características para esta imagen
+                caracteristicas_forma[clase].append((nombre, redondez, alargamiento))
+        
+        return caracteristicas_forma
+
+    # Puedes agregar un método para mostrar los resultados en consola o graficar si lo deseas
+    def mostrar_caracteristicas_forma(self, caracteristicas_forma):
+        """
+        Muestra las características extraídas (redondez y alargamiento) para cada imagen.
+        """
+        for clase, lista in caracteristicas_forma.items():
+            print(f"Clase: {clase}")
+            for (nombre, redondez, alargamiento) in lista:
+                print(f"  Imagen: {nombre} --> Redondez: {redondez:.2f}, Alargamiento: {alargamiento:.2f}")
+            print("\n")
 
     def entrenar_y_evaluar(self):
         """
@@ -240,15 +322,18 @@ if __name__ == "__main__":
     # Se establece k=4 para las 4 clases de verdura.
     # Ahora, por ejemplo, si deseas segmentar con k_segmentation=5, puedes especificarlo:
     procesador = ImageProcessorKMeans(image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=4, k_segmentation=4)
+    caracteristicas_forma = procesador.extraer_caracteristicas_forma(input_folder="ImagenesContorno")
     
+    # Mostrar las características extraídas
+    procesador.mostrar_caracteristicas_forma(caracteristicas_forma)
     # Procesa y guarda las imágenes segmentadas (usando k_segmentation para segmentación)
-    procesador.procesar_y_guardar_segmentadas()
+    #procesador.procesar_y_guardar_segmentadas()
     
     # Entrena el modelo usando características de color con normalización
-    procesador.entrenar_y_evaluar()
+    #procesador.entrenar_y_evaluar()
     
     # Evalúa la precisión usando el enfoque alternativo (voto mayoritario por cluster)
-    procesador.evaluar_precision_alternativo()
+    #procesador.evaluar_precision_alternativo()
     
     # Predicción de nuevas imágenes en la carpeta "TempImagenes"
-    procesador.predecir_imagen_nueva(temp_folder="TempImagenes")
+    #procesador.predecir_imagen_nueva(temp_folder="TempImagenes")
