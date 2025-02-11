@@ -30,49 +30,57 @@ class ImageProcessor:
 
     def aplicar_transformaciones(self, imagen):
         """
-        Aplica transformaciones a la imagen: exposición, contraste, saturación, y nitidez.
+        Aplica transformaciones a la imagen:
+        1. Aísla la verdura del fondo blanco (pone el fondo en negro).
+        2. Aumenta la saturación.
+        3. Ajusta contraste y brillo.
+        4. Redimensiona a 224x224.
+        5. Aplica un filtro de nitidez.
         """
-        # Aumentar la saturación
-        hsv = cv2.cvtColor(imagen, cv2.COLOR_RGB2HSV)
-        lower_bound = np.array([0, 0, 80], dtype=np.uint8)  # Rango bajo de color
-        upper_bound = np.array([255, 50, 255], dtype=np.uint8)  # Rango alto de color
-
-        mask = cv2.inRange(hsv, lower_bound, upper_bound)
-        # Invertir máscara para obtener el objeto
-        mask_inv = cv2.bitwise_not(mask)
-
-        # Aplicar máscara a la imagen original
-        isolated_object = cv2.bitwise_and(imagen, imagen, mask=mask_inv)
-
-        # Aplicar operaciones morfológicas para limpiar la máscara
-        kernel = np.ones((5,5), np.uint8)
-        mask_cleaned = cv2.morphologyEx(mask_inv, cv2.MORPH_OPEN, kernel, iterations=2)
-
-        # Aplicar la máscara limpia a la imagen
-        final_result = cv2.bitwise_and(imagen, imagen, mask=mask_cleaned)
-
-        # Convertir a RGB para visualización correcta en matplotlib
-        image_rgb = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)
-        isolated_rgb = cv2.cvtColor(isolated_object, cv2.COLOR_BGR2RGB)
-        final_rgb = cv2.cvtColor(final_result, cv2.COLOR_BGR2RGB)
-
-        hsv = cv2.cvtColor(final_rgb, cv2.COLOR_RGB2HSV)
-        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 140)  # Aumentar el canal de saturación
-        isolated_object = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-
-        # Aumentar el contraste
-        alpha = 1.9 # Factor de contraste (>1 aumenta el contraste)
-        beta = 20   # Valor de brillo
+        # Paso 1: Aislar la verdura del fondo blanco
+        # Definimos un rango para detectar el blanco (puedes ajustar estos valores)
+        # Aumentar contraste y brillo
+        alpha = 1.2 # Factor de contraste
+        beta = 25    # Valor de brillo
         imagen = cv2.convertScaleAbs(imagen, alpha=alpha, beta=beta)
+        
+        lower_white = np.array([140, 140, 140], dtype=np.uint8)
+        upper_white = np.array([255, 255, 255], dtype=np.uint8)
+        # Crear la máscara: los píxeles que estén en el rango se marcan con 255
+        mask = cv2.inRange(imagen, lower_white, upper_white)
+        # Invertir la máscara: la verdura (no blanco) tendrá valor 255, el fondo 0
+        mask_inv = cv2.bitwise_not(mask)
+        # Aplicar la máscara para obtener una imagen donde el fondo sea negro
+        imagen_isolada = cv2.bitwise_and(imagen, imagen, mask=mask_inv)
+
+        beta = 40    # Valor de brillo
+        imagen_isolada = cv2.convertScaleAbs(imagen_isolada, beta=beta)
+
+        # Paso 2: Aplicar transformaciones a la imagen aislada
+        # Convertir la imagen aislada a HSV para aumentar la saturación
+        hsv = cv2.cvtColor(imagen_isolada, cv2.COLOR_RGB2HSV)
+        # Aumentar la saturación: este valor (140) se puede ajustar según el resultado deseado
+        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 120)
+        # Convertir de vuelta a RGB
+        imagen_transformada = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+        lab = cv2.cvtColor(imagen_transformada, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
+        cl = clahe.apply(l)
+        lab_clahe = cv2.merge((cl, a, b))
+        imagen_transformada = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2RGB)
+        
 
         # Redimensionar la imagen a 224x224
-        imagen = cv2.resize(imagen, (224, 224), interpolation=cv2.INTER_AREA)
+        imagen_transformada = cv2.resize(imagen_transformada, (224, 224), interpolation=cv2.INTER_AREA)
 
-        # Filtro de nitidez
+        # Aplicar un filtro de nitidez
         kernel = np.array([[0, -1, 0], [-1, 5.5, -1], [0, -1, 0]])
-        imagen = cv2.filter2D(imagen, -1, kernel)
+        imagen_transformada = cv2.filter2D(imagen_transformada, -1, kernel)
 
-        return imagen
+        return imagen_transformada
+
 
     def procesar_y_guardar(self, imagenes):
         """
