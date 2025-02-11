@@ -86,7 +86,7 @@ def main():
         image_folder=carpeta_imagenes_procesadas,
         segmented_folder=carpeta_imagenes_segmentadas,
         k=4,
-        k_segmentation=5
+        k_segmentation=4
     )
     print("\nProcesando y guardando segmentaciones...")
     procesador_kmeans.procesar_y_guardar_segmentadas()

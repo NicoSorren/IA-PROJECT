@@ -32,15 +32,38 @@ class ImageProcessor:
         """
         Aplica transformaciones a la imagen: exposición, contraste, saturación, y nitidez.
         """
-        # Aumentar el contraste
-        alpha = 1.9 # Factor de contraste (>1 aumenta el contraste)
-        beta = 50   # Valor de brillo
-        imagen = cv2.convertScaleAbs(imagen, alpha=alpha, beta=beta)
-
         # Aumentar la saturación
         hsv = cv2.cvtColor(imagen, cv2.COLOR_RGB2HSV)
+        lower_bound = np.array([0, 0, 80], dtype=np.uint8)  # Rango bajo de color
+        upper_bound = np.array([255, 50, 255], dtype=np.uint8)  # Rango alto de color
+
+        mask = cv2.inRange(hsv, lower_bound, upper_bound)
+        # Invertir máscara para obtener el objeto
+        mask_inv = cv2.bitwise_not(mask)
+
+        # Aplicar máscara a la imagen original
+        isolated_object = cv2.bitwise_and(imagen, imagen, mask=mask_inv)
+
+        # Aplicar operaciones morfológicas para limpiar la máscara
+        kernel = np.ones((5,5), np.uint8)
+        mask_cleaned = cv2.morphologyEx(mask_inv, cv2.MORPH_OPEN, kernel, iterations=2)
+
+        # Aplicar la máscara limpia a la imagen
+        final_result = cv2.bitwise_and(imagen, imagen, mask=mask_cleaned)
+
+        # Convertir a RGB para visualización correcta en matplotlib
+        image_rgb = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)
+        isolated_rgb = cv2.cvtColor(isolated_object, cv2.COLOR_BGR2RGB)
+        final_rgb = cv2.cvtColor(final_result, cv2.COLOR_BGR2RGB)
+
+        hsv = cv2.cvtColor(final_rgb, cv2.COLOR_RGB2HSV)
         hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 140)  # Aumentar el canal de saturación
-        imagen = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+        isolated_object = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+        # Aumentar el contraste
+        alpha = 1.9 # Factor de contraste (>1 aumenta el contraste)
+        beta = 20   # Valor de brillo
+        imagen = cv2.convertScaleAbs(imagen, alpha=alpha, beta=beta)
 
         # Redimensionar la imagen a 224x224
         imagen = cv2.resize(imagen, (224, 224), interpolation=cv2.INTER_AREA)
