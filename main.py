@@ -75,10 +75,10 @@ def main():
         image_folder=carpeta_imagenes_verduras,
         processed_folder=carpeta_imagenes_procesadas
     )
-    imagenes = preprocesamiento_imagen.cargar_imagenes()
-    imagenes_procesadas = preprocesamiento_imagen.procesar_y_guardar(imagenes)
-    preprocesamiento_imagen.procesar_y_guardar_binarizadas(imagenes_procesadas)
-    preprocesamiento_imagen.mostrar_imagenes(imagenes, num_por_clase=1)
+    #imagenes = preprocesamiento_imagen.cargar_imagenes()
+    #imagenes_procesadas = preprocesamiento_imagen.procesar_y_guardar(imagenes)
+    #preprocesamiento_imagen.procesar_y_guardar_binarizadas(imagenes_procesadas)
+    #preprocesamiento_imagen.mostrar_imagenes(imagenes, num_por_clase=1)
 
     # Paso 2: Segmentación y Entrenamiento KMeans
     # Se especifica k=4 para la clasificación y, por ejemplo, k_segmentation=5 para la segmentación.
@@ -88,12 +88,12 @@ def main():
         k=4,
         k_segmentation=4
     )
-    print("\nProcesando y guardando segmentaciones...")
-    procesador_kmeans.procesar_y_guardar_segmentadas()
-    print("Entrenando modelo KMeans...")
-    procesador_kmeans.entrenar_y_evaluar()
+    #print("\nProcesando y guardando segmentaciones...")
+    #procesador_kmeans.procesar_y_guardar_segmentadas()
+    #print("Entrenando modelo KMeans...")
+    #procesador_kmeans.entrenar_y_evaluar()
 
-    procesador_kmeans.evaluar_precision_alternativo()
+    #procesador_kmeans.evaluar_precision_alternativo()
 
     # Paso 3: (Opcional) Procesamiento de audios, etc. (bloques comentados)
 
