@@ -169,31 +169,53 @@ class ImageProcessorKMeans:
 
     def entrenar_y_evaluar(self):
         """
-        Extrae características de color, las normaliza y entrena KMeans.
-        En este modo, se usan las características de color (promedio RGB) y se normalizan.
+        Extrae las características de color y forma, las combina y las normaliza, y entrena el modelo KMeans.
+        Se asume que las imágenes de color se extraen de 'self.segmented_folder' y las de forma se extraen de la
+        carpeta "ImagenesContorno". El vector final para cada imagen será la concatenación del promedio RGB
+        (3 valores) y de la redondez y alargamiento (2 valores), dando un vector de 5 dimensiones.
         """
         print("Extrayendo características de color...")
-        caracteristicas_color, etiquetas_color = self.extraer_caracteristicas_color(self.segmented_folder)
-        print("Aplicando normalización a las características de color...")
-        scaler_color = StandardScaler().fit(caracteristicas_color)
-        caracteristicas_color_norm = scaler_color.transform(caracteristicas_color)
-        dump(scaler_color, "scaler_color.pkl")
-        print("Scaler de color guardado: scaler_color.pkl")
-        print("Entrenando modelo KMeansManual con características de color normalizadas...")
+        # Extraer características de color desde la carpeta de imágenes segmentadas
+        color_features, labels_color = self.extraer_caracteristicas_color(self.segmented_folder)
+        
+        print("Extrayendo características de forma...")
+        # Extraer características de forma desde la carpeta de imágenes de contorno
+        # Asegúrate de que este método recorra "ImagenesContorno" y devuelva para cada imagen (redondez, alargamiento)
+        shape_features, labels_shape = self.extraer_caracteristicas_forma(input_folder="ImagenesContorno")
+        
+        # Verificar que las etiquetas coinciden (suponiendo que el orden de imágenes es el mismo)
+        if not np.array_equal(labels_color, labels_shape):
+            print("Advertencia: Las etiquetas extraídas de color y forma no coinciden. Verifica el orden de procesamiento.")
+            # Aquí podrías tomar alguna acción o al menos imprimir un aviso
+        
+        # Combinar características para cada muestra: concatenar horizontalmente
+        # Se asume que color_features es de forma (n, 3) y shape_features es de forma (n, 2)
+        combined_features = np.hstack((color_features, shape_features))
+        
+        print("Aplicando normalización a las características combinadas...")
+        scaler_combined = StandardScaler().fit(combined_features)
+        combined_features_norm = scaler_combined.transform(combined_features)
+        dump(scaler_combined, "scaler_combined.pkl")
+        print("Scaler combinado guardado: scaler_combined.pkl")
+        
+        print("Entrenando modelo KMeansManual con características combinadas...")
         kmeans = KMeansManual(n_clusters=self.k, max_iter=100, tol=1e-4)
-        kmeans.fit(caracteristicas_color_norm)
-        kmeans_labels = kmeans.predict(caracteristicas_color_norm)
-        # Asignar etiquetas a clusters mediante voto mayoritario
+        kmeans.fit(combined_features_norm)
+        kmeans_labels = kmeans.predict(combined_features_norm)
+        
+        # Asignar etiquetas a clusters mediante voto mayoritario:
         etiquetas_clusters = {}
         for i in range(self.k):
             indices_cluster = np.where(kmeans_labels == i)
-            etiquetas_reales = etiquetas_color[indices_cluster]
+            etiquetas_reales = labels_color[indices_cluster]
             etiqueta_mayoritaria = max(set(etiquetas_reales), key=list(etiquetas_reales).count)
             etiquetas_clusters[i] = etiqueta_mayoritaria
+        
         dump(kmeans, "kmeans_model.pkl")
         dump(etiquetas_clusters, "kmeans_labels.pkl")
         print("Modelo guardado: kmeans_model.pkl y etiquetas guardadas: kmeans_labels.pkl")
         print("Entrenamiento finalizado.")
+
 
     def predecir_imagen_nueva(self, temp_folder):
         """
