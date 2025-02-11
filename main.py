@@ -67,7 +67,7 @@ def main():
     carpeta_imagenes_segmentadas = os.path.join(os.getcwd(), "ImagenesSegmentadas")
     
     # Limpiar carpetas de imágenes segmentadas y etiquetadas para evitar acumulación de imágenes
-    limpiar_carpeta(carpeta_imagenes_segmentadas)
+    
     limpiar_carpeta(carpeta_imagenes_etiquetadas)
 
     # Paso 1: Procesamiento de Imágenes
@@ -75,10 +75,10 @@ def main():
         image_folder=carpeta_imagenes_verduras,
         processed_folder=carpeta_imagenes_procesadas
     )
-    #imagenes = preprocesamiento_imagen.cargar_imagenes()
+    imagenes = preprocesamiento_imagen.cargar_imagenes()
     #imagenes_procesadas = preprocesamiento_imagen.procesar_y_guardar(imagenes)
     #preprocesamiento_imagen.procesar_y_guardar_binarizadas(imagenes_procesadas)
-    #preprocesamiento_imagen.mostrar_imagenes(imagenes, num_por_clase=1)
+    preprocesamiento_imagen.mostrar_imagenes(imagenes, num_por_clase=1)
 
     # Paso 2: Segmentación y Entrenamiento KMeans
     # Se especifica k=4 para la clasificación y, por ejemplo, k_segmentation=5 para la segmentación.

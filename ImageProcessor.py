@@ -123,92 +123,248 @@ class ImageProcessor:
             #print(f"Mostrando imágenes de: {verdura}")
             carpeta_original = self.image_folder
             carpeta_procesada = self.processed_folder
-            carpeta_binarizada = "ImagenesBinarizadas"
 
             for i, (nombre, _) in enumerate(imagenes[verdura][:num_por_clase]):
                 # Rutas de las imágenes
                 ruta_original = os.path.join(carpeta_original, verdura, nombre)
                 ruta_procesada = os.path.join(carpeta_procesada, verdura, nombre)
-                ruta_binarizada = os.path.join(carpeta_binarizada, verdura, f"binarizada_{nombre}")
                 
                 # Leer imágenes
                 img_original = cv2.imread(ruta_original)
                 img_procesada = cv2.imread(ruta_procesada)
-                img_binarizada = cv2.imread(ruta_binarizada, cv2.IMREAD_GRAYSCALE)
+
                 
                 # Convertir imágenes a formato RGB para mostrar correctamente con matplotlib
                 img_original = cv2.cvtColor(img_original, cv2.COLOR_BGR2RGB)
                 img_procesada = cv2.cvtColor(img_procesada, cv2.COLOR_BGR2RGB)
                 
                 # Mostrar imágenes
-                plt.subplot(total_clases, num_por_clase * 3, idx * num_por_clase * 3 + i * 3 + 1)
+                plt.subplot(total_clases, num_por_clase * 2, idx * num_por_clase * 2 + i * 2 + 1)
                 plt.imshow(img_original)
                 plt.title(f"{verdura} - Original")
                 plt.axis("off")
 
-                plt.subplot(total_clases, num_por_clase * 3, idx * num_por_clase * 3 + i * 3 + 2)
-                plt.imshow(img_procesada)
+                plt.subplot(total_clases, num_por_clase * 2, idx * num_por_clase * 2 + i * 2 + 2)
+                plt.imshow(cv2.cvtColor(img_procesada, cv2.COLOR_BGR2RGB))
                 plt.title(f"{verdura} - Procesada")
                 plt.axis("off")
 
-                plt.subplot(total_clases, num_por_clase * 3, idx * num_por_clase * 3 + i * 3 + 3)
-                plt.imshow(img_binarizada, cmap="gray")
-                plt.title(f"{verdura} - Binarizada")
-                plt.axis("off")
+                
+        plt.tight_layout()
+        plt.show()
 
+    
+    def binarizar_otsu_con_relleno(self, imagen):
+        """
+        Convierte la imagen (en BGR) a escala de grises, aplica un desenfoque y
+        utiliza Otsu para binarizar la imagen. Luego, usando floodFill, rellena los huecos
+        internos sin modificar el contorno del objeto (la verdura). 
+        Finalmente, se aplica una operación morfológica de cierre para suavizar los bordes.
+        Se muestra la imagen final y se retorna la imagen binaria con los huecos rellenados
+        y los bordes suavizados.
+        """
+        # 1. Convertir a escala de grises
+        gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+        
+        # 2. Suavizar con desenfoque gaussiano
+        suavizada = cv2.GaussianBlur(gris, (5, 5), 0)
+        
+        # 3. Binarización con Otsu
+        _, binaria = cv2.threshold(suavizada, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # 4. Rellenar huecos internos usando floodFill
+        floodfill = binaria.copy()
+        h, w = binaria.shape[:2]
+        mask = np.zeros((h+2, w+2), np.uint8)
+        cv2.floodFill(floodfill, mask, (0, 0), 255)
+        floodfill_inv = cv2.bitwise_not(floodfill)
+        binaria_rellena = binaria | floodfill_inv
+        
+        # 5. Suavizar los bordes aplicando cierre morfológico
+        kernel_smooth = np.ones((3, 3), np.uint8)
+        binaria_rellena = cv2.morphologyEx(binaria_rellena, cv2.MORPH_CLOSE, kernel_smooth, iterations=1)
+        
+        # 6. Mostrar la imagen resultante
+        #plt.figure()
+        #plt.imshow(binaria_rellena, cmap="gray")
+        #plt.title("Imagen Binarizada con Otsu, Huecos Rellenados y Bordes Suavizados")
+        #plt.axis("off")
+        #plt.show()
+        
+        return binaria_rellena
+    
+    def procesar_y_guardar_binarizadas(self, imagenes, output_folder="ImagenesBinarizadas"):
+        """
+        Aplica la binarización con Otsu, relleno de huecos y suavizado de bordes a cada imagen,
+        y guarda las imágenes resultantes en la carpeta 'ImagenesBinarizadas' manteniendo la estructura
+        por clases. Devuelve un diccionario con las imágenes binarizadas.
+        """
+        imagenes_binarizadas = {}  # Diccionario para almacenar las imágenes binarizadas en memoria
+
+        # Crear la carpeta de salida, si no existe. Si existe, se puede sobreescribir.
+        os.makedirs(output_folder, exist_ok=True)
+
+        for verdura, lista_imagenes in imagenes.items():
+            carpeta_destino = os.path.join(output_folder, verdura)
+            os.makedirs(carpeta_destino, exist_ok=True)
+
+            imagenes_binarizadas[verdura] = []
+
+            for nombre, imagen in lista_imagenes:
+                # Aplicar el método de binarización con Otsu, relleno y suavizado de bordes
+                imagen_binarizada = self.binarizar_otsu_con_relleno(imagen)
+                imagenes_binarizadas[verdura].append((nombre, imagen_binarizada))
+
+                # Guardar la imagen binarizada en la carpeta de salida
+                ruta_guardado = os.path.join(carpeta_destino, nombre)
+                cv2.imwrite(ruta_guardado, imagen_binarizada)
+
+        return imagenes_binarizadas
+
+    
+    def mostrar_y_guardar_imagenes_binarizadas_otsu_relleno(self, num_por_clase=1):
+        """
+        Recorre todas las imágenes en la carpeta de imágenes procesadas,
+        les aplica la binarización con Otsu, relleno de huecos y suavizado de bordes,
+        guarda las imágenes resultantes en la carpeta "ImagenesBinarizadas"
+        (creándola o limpiándola si ya existe) y muestra todas las imágenes binarizadas en una cuadrícula.
+        
+        num_por_clase: número de imágenes por clase a procesar y mostrar.
+        """
+        output_folder = "ImagenesBinarizadas"
+        # Crear la carpeta si no existe; si existe, eliminar archivos anteriores
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        else:
+            for file in os.listdir(output_folder):
+                ruta_file = os.path.join(output_folder, file)
+                try:
+                    os.remove(ruta_file)
+                except Exception as e:
+                    print(f"No se pudo eliminar {ruta_file}: {e}")
+
+        clases = os.listdir(self.processed_folder)
+        total_clases = len(clases)
+        
+        plt.figure(figsize=(15, 5 * total_clases))
+        
+        for idx, clase in enumerate(clases):
+            carpeta_clase = os.path.join(self.processed_folder, clase)
+            imagenes = os.listdir(carpeta_clase)
+            
+            # Mostrar y guardar hasta num_por_clase imágenes por clase
+            for i, nombre in enumerate(imagenes[:num_por_clase]):
+                ruta_imagen = os.path.join(carpeta_clase, nombre)
+                imagen = cv2.imread(ruta_imagen)  # Se carga en BGR
+                if imagen is not None:
+                    imagen_binarizada = self.binarizar_otsu_con_relleno(imagen)
+                    
+                    # Guardar la imagen binarizada en la carpeta "ImagenesBinarizadas"
+                    # Puedes formar el nombre como "clase_binarizada_nombre"
+                    nombre_guardado = f"{clase}_binarizada_{nombre}"
+                    ruta_guardado = os.path.join(output_folder, nombre_guardado)
+                    cv2.imwrite(ruta_guardado, imagen_binarizada)
+                    
+                    # Ubicar la imagen en la cuadrícula para mostrarla
+                    plt.subplot(total_clases, num_por_clase, idx * num_por_clase + i + 1)
+                    plt.imshow(imagen_binarizada, cmap="gray")
+                    plt.title(f"{clase} - {nombre}")
+                    plt.axis("off")
+                else:
+                    print(f"No se pudo leer la imagen: {ruta_imagen}")
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def detectar_contornos_canny(self, imagen):
+        """
+        Aplica el detector de bordes Canny a la imagen.
+        Si la imagen está en color, se convierte a escala de grises.
+        Retorna el mapa de bordes.
+        """
+        # Si la imagen tiene 3 canales, convertir a escala de grises
+        if len(imagen.shape) == 3:
+            gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+        else:
+            gris = imagen
+        # Aplicar el detector de bordes Canny
+        edges = cv2.Canny(gris, 50, 150)
+        return edges
+
+    
+    def procesar_y_guardar_contornos_canny(self, input_folder="ImagenesBinarizadas", output_folder="ImagenesContorno", num_por_clase=1):
+        """
+        Recorre todas las imágenes en la carpeta 'input_folder' (por defecto, ImagenesBinarizadas),
+        aplica el detector de bordes Canny para extraer los contornos, y guarda los mapas de bordes
+        resultantes en la carpeta 'output_folder', manteniendo la estructura de carpetas por clase.
+        Además, muestra todas las imágenes resultantes en una cuadrícula.
+        
+        num_por_clase: número de imágenes por clase a procesar y mostrar.
+        """
+        # Crear la carpeta de salida si no existe; si existe, limpiar su contenido (solo archivos)
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        else:
+            for root, dirs, files in os.walk(output_folder):
+                for file in files:
+                    try:
+                        os.remove(os.path.join(root, file))
+                    except Exception as e:
+                        print(f"No se pudo eliminar {file}: {e}")
+                        
+        # Listar las subcarpetas (clases) en el input_folder
+        clases = os.listdir(input_folder)
+        total_clases = len(clases)
+        
+        # Preparar figura para mostrar
+        plt.figure(figsize=(15, 5 * total_clases))
+        
+        for idx, clase in enumerate(clases):
+            carpeta_input = os.path.join(input_folder, clase)
+            carpeta_output = os.path.join(output_folder, clase)
+            os.makedirs(carpeta_output, exist_ok=True)
+            
+            imagenes = os.listdir(carpeta_input)
+            for i, nombre in enumerate(imagenes[:num_por_clase]):
+                ruta_imagen = os.path.join(carpeta_input, nombre)
+                # Leer la imagen (se asume que está en BGR, ya que se guardó con cv2.imwrite)
+                imagen = cv2.imread(ruta_imagen)
+                if imagen is None:
+                    print(f"No se pudo leer la imagen: {ruta_imagen}")
+                    continue
+
+                # Aplicar el detector de bordes Canny usando tu método definido
+                edges = self.detectar_contornos_canny(imagen)
+                
+                # Guardar la imagen resultante en output_folder
+                ruta_guardado = os.path.join(carpeta_output, nombre)
+                cv2.imwrite(ruta_guardado, edges)
+                
+                # Mostrar la imagen en la cuadrícula
+                plt.subplot(total_clases, num_por_clase, idx * num_por_clase + i + 1)
+                plt.imshow(edges, cmap="gray")
+                plt.title(f"{clase} - {nombre}")
+                plt.axis("off")
+        
         plt.tight_layout()
         plt.show()
 
 
-    def binarizar_adaptativa(self, imagen):
-        """
-        Aplica binarización con filtro de ruido, contorno limpio y relleno de agujeros.
-        """
-        # Convertir a escala de grises
-        gris = cv2.cvtColor(imagen, cv2.COLOR_RGB2GRAY)
-        
-        # Filtro Gaussiano para suavizar ruido
-        suavizada = cv2.GaussianBlur(gris, (5, 5), 0)
-        
-        # Binarización (Otsu)
-        _, binarizada = cv2.threshold(suavizada, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        # Operaciones morfológicas
-        kernel = np.ones((6, 6), np.uint8)  # Aumentar tamaño del kernel si es necesario
-        apertura = cv2.morphologyEx(binarizada, cv2.MORPH_OPEN, kernel, iterations=2)  # Eliminar ruido pequeño
-        cierre = cv2.morphologyEx(apertura, cv2.MORPH_CLOSE, kernel, iterations=3)  # Rellenar agujeros
-        
-        return cierre
-    
-    def procesar_y_guardar_binarizadas(self, imagenes, output_folder="ImagenesBinarizadas"):
-        """
-        Binariza y guarda las imágenes en una carpeta.
-        """
-        os.makedirs(output_folder, exist_ok=True)  # Crear carpeta si no existe
-        
-        for verdura, lista_imagenes in imagenes.items():
-            carpeta_destino = os.path.join(output_folder, verdura)
-            os.makedirs(carpeta_destino, exist_ok=True)
-            
-            for nombre, imagen in lista_imagenes:
-                # Binarizar imagen
-                imagen_binarizada = self.binarizar_adaptativa(imagen)
-                ruta_guardado = os.path.join(carpeta_destino, f"binarizada_{nombre}")
-                cv2.imwrite(ruta_guardado, imagen_binarizada)
-                #print(f"Imagen binarizada guardada: {ruta_guardado}")
-        return imagen_binarizada
-                
-# Ejemplo de uso
+
+
 if __name__ == "__main__":
     procesador = ImageProcessor(image_folder="ImagenesVerduras", processed_folder="ImagenesProcesadas")
     
     # Cargar imágenes originales
     imagenes = procesador.cargar_imagenes()
     
-    # Procesar y guardar imágenes (con brillo, saturación, etc.)
+    # Procesar y guardar imágenes (transformaciones)
     imagenes_procesadas = procesador.procesar_y_guardar(imagenes)
     
-    # Aplicar binarización sobre las imágenes procesadas
-    procesador.procesar_y_guardar_binarizadas(imagenes_procesadas)
-
+    # Mostrar imágenes originales y procesadas
     procesador.mostrar_imagenes(imagenes, num_por_clase=1)
+    
+    # Procesar y guardar las imágenes binarizadas en "ImagenesBinarizadas"
+    imagenes_binarizadas = procesador.procesar_y_guardar_binarizadas(imagenes_procesadas)
+
+    procesador.procesar_y_guardar_contornos_canny(num_por_clase=10)
