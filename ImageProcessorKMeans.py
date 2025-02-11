@@ -88,51 +88,34 @@ class ImageProcessorKMeans:
         """
         Recorre todas las imágenes en la carpeta 'input_folder' (por defecto, ImagenesContorno)
         y extrae dos características de forma para el contorno principal de cada imagen:
-            - Redondez (Circularidad)
-            - Alargamiento (relación entre eje mayor y eje menor de la elipse ajustada)
-            
-        Retorna un diccionario con la siguiente estructura:
-            {
-              'nombre_clase': [
-                  (nombre_imagen, redondez, alargamiento),
-                  (nombre_imagen, redondez, alargamiento),
-                  ...
-              ],
-              ...
-            }
+            - Redondez (circularidad)
+            - Alargamiento (relación entre eje mayor y eje menor)
+        
+        Retorna dos arrays:
+            - shape_features: de forma (n, 2) donde n es el número total de imágenes, y cada fila contiene [redondez, alargamiento]
+            - labels: de forma (n,) con la etiqueta (nombre de la subcarpeta) correspondiente a cada imagen.
         """
-        caracteristicas_forma = {}
+        shape_features = []
+        labels = []
         
-        # Listar las subcarpetas (clases) en input_folder
-        clases = os.listdir(input_folder)
-        
-        for clase in clases:
+        # Listar las subcarpetas (clases) en input_folder de forma ordenada
+        for clase in sorted(os.listdir(input_folder)):
             carpeta_clase = os.path.join(input_folder, clase)
             if not os.path.isdir(carpeta_clase):
                 continue
-            
-            caracteristicas_forma[clase] = []
-            imagenes = os.listdir(carpeta_clase)
-            
-            for nombre in imagenes:
+            # Iterar sobre cada imagen de la clase (ordenada por nombre para consistencia)
+            for nombre in sorted(os.listdir(carpeta_clase)):
                 ruta_imagen = os.path.join(carpeta_clase, nombre)
-                # Leer la imagen; se espera que esté en un formato adecuado (por ejemplo, en BGR)
-                img = cv2.imread(ruta_imagen)
+                # Leer la imagen en escala de grises (ya que se guardaron como imágenes binarizadas)
+                img = cv2.imread(ruta_imagen, cv2.IMREAD_GRAYSCALE)
                 if img is None:
                     print(f"No se pudo leer la imagen: {ruta_imagen}")
                     continue
-                # Convertir a escala de grises si no lo está ya
-                if len(img.shape) == 3:
-                    gris = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                else:
-                    gris = img.copy()
-                
-                # Encontrar contornos
-                contours, hierarchy = cv2.findContours(gris.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                # Extraer contornos de la imagen
+                contours, hierarchy = cv2.findContours(img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 if not contours:
                     print(f"No se encontraron contornos en la imagen: {ruta_imagen}")
                     continue
-                
                 # Seleccionar el contorno con mayor área
                 contorno_principal = max(contours, key=cv2.contourArea)
                 
@@ -141,20 +124,22 @@ class ImageProcessorKMeans:
                 perimetro = cv2.arcLength(contorno_principal, True)
                 redondez = (4 * np.pi * area) / (perimetro * perimetro) if perimetro > 0 else 0
                 
-                # Calcular alargamiento usando cv2.fitEllipse (si el contorno tiene al menos 5 puntos)
+                # Calcular alargamiento ajustando una elipse si hay suficientes puntos
                 if len(contorno_principal) >= 5:
                     ellipse = cv2.fitEllipse(contorno_principal)
-                    eje1, eje2 = ellipse[1]  # ellipse[1] devuelve una tupla (dim1, dim2)
+                    # ellipse[1] es una tupla con las dimensiones de la elipse (por ejemplo, (width, height))
+                    eje1, eje2 = ellipse[1]
                     eje_mayor = max(eje1, eje2)
                     eje_menor = min(eje1, eje2)
                     alargamiento = eje_mayor / eje_menor if eje_menor > 0 else 0
                 else:
                     alargamiento = 0
                 
-                # Guardar las características para esta imagen
-                caracteristicas_forma[clase].append((nombre, redondez, alargamiento))
+                shape_features.append([redondez, alargamiento])
+                labels.append(clase)
         
-        return caracteristicas_forma
+        return np.array(shape_features), np.array(labels)
+
 
     # Puedes agregar un método para mostrar los resultados en consola o graficar si lo deseas
     def mostrar_caracteristicas_forma(self, caracteristicas_forma):
