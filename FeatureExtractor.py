@@ -208,7 +208,6 @@ class FeatureExtractor:
                     features = self.pca.transform(features)
                 except Exception as e:
                     print("No se ha podido aplicar PCA")
-            print(f"Características extraídas y transformadas del archivo de prueba: {features}")
        
         return features
 
@@ -284,11 +283,6 @@ class FeatureExtractor:
         # Calcular la suma acumulada
         cumulative = np.cumsum(evr)
         
-        # Imprimir la varianza explicada y la acumulada
-        print("Varianza explicada por cada componente:")
-        print(evr)
-        print("Varianza acumulada:")
-        print(cumulative)
         
         # Crear el scree plot
         plt.figure(figsize=(8, 5))
